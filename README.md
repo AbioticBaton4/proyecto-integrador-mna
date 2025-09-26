@@ -38,7 +38,8 @@ proyecto-integrador-mna/
 ├── config/               # Archivos de configuración
 ├── tests/                # Pruebas unitarias
 ├── docs/                 # Documentación
-├── requirements.txt      # Dependencias de Python
+├── requirements.txt      # Dependencias de Python (pip)
+├── environment.yml       # Configuración de entorno conda
 ├── .gitignore           # Archivos a ignorar por Git
 └── README.md            # Este archivo
 ```

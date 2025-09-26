@@ -1,0 +1,48 @@
+name: depression-analysis
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  # Core data science libraries
+  - pandas
+  - numpy
+  - scipy
+  - scikit-learn
+  - statsmodels
+  
+  # Visualization libraries
+  - matplotlib
+  - seaborn
+  - plotly
+  
+  # Jupyter environment
+  - jupyter
+  - notebook
+  - ipykernel
+  - ipywidgets
+  
+  # Data processing
+  - openpyxl
+  
+  # Additional useful libraries for ML
+  - pip
+  - pip:
+    # From requirements.txt
+    - gdown
+    
+    # Data formats and processing
+    - pyarrow
+    - tabulate
+    - xlrd
+    
+    # Additional ML libraries via pip
+    - joblib
+    - imbalanced-learn
+    - xgboost
+    - lightgbm
+    - optuna
+    - yellowbrick
+    
+    # Progress bars and utilities
+    - tqdm
