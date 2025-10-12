@@ -2,6 +2,9 @@ import pandas as pd
 from tabulate import tabulate
 from datetime import datetime, timedelta
 import holidays
+import plotly.express as px
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 
 def load_data(path, show_info=True, num_rows=5):
@@ -18,6 +21,7 @@ def load_data(path, show_info=True, num_rows=5):
     """
     print(f"Cargando datos desde: {path}")
     df = pd.read_parquet(path)
+    df = clean_column_names(df)
     
     if show_info:
         print(f"Dimensiones del DataFrame: {df.shape}")
@@ -262,3 +266,30 @@ def encontrar_festivos_en_semana(df, fecha_col='fecha', festivos_mx = holidays.M
         return 0
     else:
         return 1
+
+def plot_timeseries(df,x='fecha',y ='valor_acumulado', title='Serie de tiempo general "Acumulada"', plotly_engine=False):
+
+    if plotly_engine:
+        if 'semana' not in df.columns:
+            df['semana'] = df['fecha'].dt.isocalendar().week
+        fig = px.line(df, x=x, y=y,title=title,
+              hover_data={'semana': True, 'fecha': True},
+              markers=True,
+            )
+        # Ajustar el tamaño de los marcadores
+        fig.update_traces(marker=dict(size=4))
+        # # fig.update_layout(height=800)
+        fig.show()
+    else:
+        fig= sns.lineplot(data=df, x=x, y=y, marker='o')
+        fig.set_title(title)
+        fig.set_xlabel(x)
+        fig.set_ylabel(y)
+        fig.grid(True)
+        fig.figure.set_size_inches(11, 6)
+        plt.show()
+
+def get_cummulative_data(df,column, group_by):
+    df = df.groupby(group_by)[column].sum().reset_index()
+    df['valor_acumulado'] = df[column].cumsum()
+    return df
