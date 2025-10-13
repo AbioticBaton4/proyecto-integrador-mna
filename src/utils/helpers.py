@@ -27,7 +27,8 @@ def load_data(path, show_info=True, num_rows=5):
         print(f"Dimensiones del DataFrame: {df.shape}")
         print("\nPrimeras filas del DataFrame:")
         # print(tabulate(df.head(num_rows), headers='keys', tablefmt='rounded_outline', showindex=False))
-        display(df.head(num_rows))    
+        display(df.head(num_rows))
+        display(df.info())
     return df
 
 def clean_column_names(df):
