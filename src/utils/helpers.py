@@ -5,6 +5,8 @@ import holidays
 import plotly.express as px
 import seaborn as sns
 import matplotlib.pyplot as plt
+from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.tsa.stattools import adfuller, kpss
 
 
 def load_data(path, show_info=True, num_rows=5):
@@ -269,7 +271,7 @@ def encontrar_festivos_en_semana(df, fecha_col='fecha', festivos_mx = holidays.M
         return 1
 
 def plot_timeseries(df,x='fecha',y ='valor_acumulado', title='Serie de tiempo general "Acumulada"', plotly_engine=False):
-
+    df = df.copy()
     if plotly_engine:
         if 'semana' not in df.columns:
             df['semana'] = df['fecha'].dt.isocalendar().week
@@ -294,3 +296,61 @@ def get_cummulative_data(df,column, group_by):
     df = df.groupby(group_by)[column].sum().reset_index()
     df['valor_acumulado'] = df[column].cumsum()
     return df
+
+def show_decomposition(ts, model='additive', return_decomposition=False, figsize=(10, 8)):
+    decomposition = seasonal_decompose(ts, model=model)
+    fig = decomposition.plot()
+    fig.set_size_inches(*figsize)
+    plt.suptitle('Descomposición de la Serie Temporal', fontsize=16)
+    plt.tight_layout()
+    plt.show()
+    if return_decomposition:
+        return decomposition
+    
+# from tabulate import tabulate
+
+def get_crit_val(crit_values, signif):
+    crit_vals = [(key, value) for key, value in crit_values.items()]
+    crit_val = next((value for key, value in crit_vals if float(key.strip('%')) == signif*100), None)
+    return crit_vals, crit_val
+
+def get_analysis_table(tipo='ADF', estadistico=None, p_value=None, crit_val=None, signif=None):
+    analysis_table = [
+        ("Métrica", "Valor Prueba", 'Nivel de Significancia'),
+        (f"Estadístico {tipo}", estadistico, crit_val),
+        ("p-value", p_value, signif),
+    ]
+    return analysis_table
+
+def adf_test(series, signif=0.05, show_crit_vals=False, show_analysis_table=True):
+    result = adfuller(series)
+    print('Resultados de la Prueba ADF')
+    estadistico, p_value, used_lag, n_obs, crit_values, icbest = result
+    # print('Estadistico ADF:', estadistico)
+    # print('p-value:', p_value)
+    # Obtener valores criticos y valor critico para el nivel de significancia dado
+    crit_vals, crit_val = get_crit_val(crit_values, signif)
+    if show_crit_vals:
+        print('Valores críticos:')
+        print(tabulate(crit_vals, headers=["Nivel", "Valor crítico"], tablefmt="rounded_outline"))
+    if show_analysis_table:
+        analysis_table = get_analysis_table(tipo='ADF', estadistico=estadistico, p_value=p_value, crit_val=crit_val, signif=signif)
+        print(tabulate(analysis_table, headers='firstrow', tablefmt="fancy_grid"))
+    return estadistico, p_value, crit_val
+
+
+def kpss_test(series, signif=0.05, show_crit_vals=False, show_analysis_table=True):
+    result = kpss(series, regression='c')
+    estadistico, p_value, lags, crit_values = result
+    print('\nResultados de la Prueba KPSS')
+    # print('Estadistico KPSS:', estadistico)
+    # print('p-value:', p_value)
+    crit_vals, crit_val = get_crit_val(crit_values, signif)
+    if show_crit_vals:
+        print('Valores críticos:')
+        print(tabulate(crit_vals, headers=["Nivel", "Valor crítico"], tablefmt="rounded_outline"))
+    if show_analysis_table:
+        analysis_table = get_analysis_table(tipo='KPSS', estadistico=estadistico, p_value=p_value, crit_val=crit_val, signif=signif)
+        print(tabulate(analysis_table, headers='firstrow', tablefmt="fancy_grid"))
+
+    return estadistico, p_value, crit_val
