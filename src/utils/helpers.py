@@ -4,10 +4,15 @@ from datetime import datetime, timedelta
 import holidays
 import plotly.express as px
 import seaborn as sns
+import numpy as np
+from scipy import stats
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.stattools import adfuller, kpss
-
+from typing import Literal, Optional
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from plotly.subplots import make_subplots
 
 def load_data(path, show_info=True, num_rows=5):
     """
@@ -270,7 +275,10 @@ def encontrar_festivos_en_semana(df, fecha_col='fecha', festivos_mx = holidays.M
     else:
         return 1
 
-def plot_timeseries(df,x='fecha',y ='valor_acumulado', title='Serie de tiempo general "Acumulada"', plotly_engine=False):
+def plot_timeseries(df,x='fecha',y ='valor_acumulado', 
+                    title='Serie de tiempo general "Acumulada"', 
+                    plotly_engine=False, figsize=(12, 6), 
+                    hover_mode : Optional[Literal['x unified', 'y unified']] = None):
     df = df.copy()
     if plotly_engine:
         if 'semana' not in df.columns:
@@ -281,15 +289,18 @@ def plot_timeseries(df,x='fecha',y ='valor_acumulado', title='Serie de tiempo ge
             )
         # Ajustar el tamaño de los marcadores
         fig.update_traces(marker=dict(size=4))
-        # # fig.update_layout(height=800)
+        fig.update_layout(
+            width=int(figsize[0]*80),
+            height=int(figsize[1]*80),
+            hovermode=hover_mode)  # hover aparece dentro de la gráfica)
         fig.show()
     else:
-        fig= sns.lineplot(data=df, x=x, y=y, marker='o')
-        fig.set_title(title)
-        fig.set_xlabel(x)
-        fig.set_ylabel(y)
-        fig.grid(True)
-        fig.figure.set_size_inches(11, 6)
+        fig, ax = plt.subplots(figsize=figsize)
+        sns.lineplot(data=df, x=x, y=y, marker='o', ax=ax)
+        ax.set_title(title)
+        ax.set_xlabel(x)
+        ax.set_ylabel(y)
+        ax.grid(True)
         plt.show()
 
 def get_cummulative_data(df,column, group_by):
@@ -354,3 +365,186 @@ def kpss_test(series, signif=0.05, show_crit_vals=False, show_analysis_table=Tru
         print(tabulate(analysis_table, headers='firstrow', tablefmt="fancy_grid"))
 
     return estadistico, p_value, crit_val
+
+def get_original_scale(series, method='log', lambda_val=None):
+    """
+    Convierte una serie transformada de vuelta a su escala original.
+    
+    Args:
+        series: Serie de pandas con valores transformados
+        method: Método de transformación ('log' o 'boxcox')
+        lambda_val: Parámetro lambda para Box-Cox (requerido si method='boxcox')
+    
+    Returns:
+        Serie en escala original
+    """
+    if method == 'log':
+        return np.expm1(series)
+    elif method == 'boxcox':
+        if lambda_val is None:
+            raise ValueError("El parámetro lambda_val es requerido para la transformación Box-Cox.")
+        return stats.inv_boxcox(series, lambda_val)
+    else:
+        raise ValueError(f"Método '{method}' no soportado. Use 'log' o 'boxcox'.")
+    
+
+def get_original_scale_dataframe(data, method='log', lambda_val=None, original_col_name='valor_original', scaled_col_name='valor'):
+    """
+    Convierte datos transformados a DataFrame con escala original incluida.
+    
+    Args:
+        data: Serie o DataFrame con valores transformados
+        method: Método de transformación ('log' o 'boxcox')
+        lambda_val: Parámetro lambda para Box-Cox (requerido si method='boxcox')
+        original_col_name: Nombre para la columna con valores en escala original
+        scaled_col_name: Nombre para la columna con valores transformados
+    
+    Returns:
+        DataFrame con fecha, valores transformados y valores en escala original
+    """
+    # Validación y conversión de tipo de entrada
+    if isinstance(data, pd.DataFrame):
+        df_data = data
+    elif isinstance(data, pd.Series):
+        df_data = data.to_frame()
+    else:
+        raise ValueError("El argumento 'data' debe ser una Serie o DataFrame de pandas.")
+    
+    # Crear copia y preparar columnas
+    df_copy = df_data.copy().reset_index()
+    df_copy.columns = ['fecha', scaled_col_name]
+    
+    # Convertir a escala original
+    df_copy[original_col_name] = get_original_scale(df_copy[scaled_col_name], method=method, lambda_val=lambda_val)
+    
+    return df_copy
+
+def plot_forecast(*dataframes, x='fecha', y='valor_log', 
+                  title = 'Comparación de Serie Original, Ajustada y Pronosticada', 
+                  figsize=(12, 6), plotly_engine=False, mode='lines',
+                  hover_mode : Optional[Literal['x unified', 'y unified']] = None):
+    if plotly_engine:
+        fig = go.Figure()
+
+        for df, label in dataframes:
+            df_copy = df.copy()
+            if 'semana' not in df.columns:
+                df_copy['semana'] = df_copy['fecha'].dt.isocalendar().week
+            fig.add_trace(go.Scatter(
+                x=df_copy[x], 
+                y=df_copy[y], 
+                mode=mode, 
+                name=label,
+                hovertemplate=
+                    f'<b>{label}</b><br>' +
+                    'Fecha: %{x}<br>' +
+                    f'{y}: ' + '%{y}<br>' +
+                    'Semana: %{customdata[0]}<extra></extra>',
+                customdata=df_copy[['semana']].values
+            ))
+
+        fig.update_layout(
+            title=title, 
+            xaxis_title=x, 
+            yaxis_title=y,
+            width=int(figsize[0]*80),
+            height=int(figsize[1]*80),
+            hovermode=hover_mode,  # hover aparece dentro de la gráfica
+            legend_title='Series'
+        )
+        fig.show()
+    else:
+        fig, ax = plt.subplots(figsize=figsize)
+
+        for df, label in dataframes:
+            sns.lineplot(data=df, x=x, y=y, label=label, ax=ax)
+
+        ax.set_xlabel(x)
+        ax.set_ylabel(y)
+        ax.set_title(title)
+        ax.legend()
+        ax.grid(True)
+        plt.show()
+
+
+def evaluate_model(y_true, y_pred, show_metrics=False):
+    mae = mean_absolute_error(y_true, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+    if show_metrics:
+        print("Evaluación del modelo en el conjunto de entrenamiento:")
+        metrics_table = [
+            ["Métrica", "Valor"],
+            ["MAE", mae],
+            ["RMSE", rmse]
+        ]
+        print(tabulate(metrics_table, headers="firstrow", tablefmt="fancy_grid"))
+    return mae, rmse
+
+
+
+def plot_residuals_over_time(y_true, y_pred, figsize=(12, 6),
+                             title = 'Análisis de Errores',
+                             plotly_engine = False):
+    # Configuraciones comunes
+    xlabel_hist = 'Errores'
+    ylabel_hist = 'Frecuencia'
+    xlabel_scatter = 'Valores Reales'
+    ylabel_scatter = 'Predicciones'
+    hist_title = 'Distribución de Errores'
+    scatter_title = 'Valores Reales vs Predicciones'
+
+    y_true_aligned = y_true
+    y_pred_aligned = y_pred
+    if not y_true_aligned.index.equals(y_pred_aligned.index):
+        # Reindexa y_pred para que coincida con y_true
+        y_pred_aligned = y_pred_aligned.set_axis(y_true_aligned.index)
+    x = [min(y_true_aligned), max(y_true_aligned)]
+    y = [min(y_true_aligned), max(y_true_aligned)]
+    residuals = y_true_aligned - y_pred_aligned
+    if plotly_engine:
+        fig = make_subplots(rows=1, cols=2, subplot_titles=[hist_title, scatter_title])
+
+        fig.add_trace(
+            go.Histogram(x=residuals, nbinsx=30, name='Errores', marker_color='blue', opacity=0.7),
+            row=1, col=1
+        )
+
+        fig.add_trace(
+            go.Scatter(x=y_true_aligned, y=y_pred_aligned, mode='markers', name='Predicciones', marker=dict(color='orange')),
+            row=1, col=2
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=x,
+                y=y,
+                # y=[min(y_pred_aligned), max(y_pred_aligned)],
+                mode='lines',
+                line=dict(color='black', dash='dash'),
+                showlegend=False
+            ),
+            row=1, col=2
+        )
+        fig.update_xaxes(title_text=xlabel_hist, row=1, col=1)
+        fig.update_yaxes(title_text=ylabel_hist, row=1, col=1)
+        fig.update_xaxes(title_text=xlabel_scatter, row=1, col=2)
+        fig.update_yaxes(title_text=ylabel_scatter, row=1, col=2)
+        fig.update_layout(width=int(figsize[0]*80),
+                          height=int(figsize[1]*80), 
+                          title_text=title)
+        fig.show()
+    else:
+        plt.figure(figsize=figsize)
+        plt.subplot(1, 2, 1)
+        sns.histplot(residuals, bins=30)
+        plt.title(hist_title)
+        plt.xlabel(xlabel_hist)
+        plt.ylabel(ylabel_hist)
+        plt.subplot(1, 2, 2)
+        plt.scatter(y_true_aligned, y_pred_aligned)
+        plt.plot(x, y, 'k--', lw=2)
+        plt.title(scatter_title)
+        plt.xlabel(xlabel_scatter)
+        plt.ylabel(ylabel_scatter)
+        plt.suptitle(title)
+        plt.tight_layout()
+        plt.show()
