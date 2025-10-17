@@ -29,6 +29,7 @@ def load_data(path, show_info=True, num_rows=5):
     print(f"Cargando datos desde: {path}")
     df = pd.read_parquet(path)
     df = clean_column_names(df)
+    print("Datos cargados exitosamente.")
     
     if show_info:
         print(f"Dimensiones del DataFrame: {df.shape}")
@@ -384,6 +385,8 @@ def get_original_scale(series, method='log', lambda_val=None):
         if lambda_val is None:
             raise ValueError("El parámetro lambda_val es requerido para la transformación Box-Cox.")
         return stats.inv_boxcox(series, lambda_val)
+    elif method == 'passthrough':
+        return series
     else:
         raise ValueError(f"Método '{method}' no soportado. Use 'log' o 'boxcox'.")
     
@@ -415,7 +418,8 @@ def get_original_scale_dataframe(data, method='log', lambda_val=None, original_c
     df_copy.columns = ['fecha', scaled_col_name]
     
     # Convertir a escala original
-    df_copy[original_col_name] = get_original_scale(df_copy[scaled_col_name], method=method, lambda_val=lambda_val)
+    if method != 'passthrough':
+        df_copy[original_col_name] = get_original_scale(df_copy[scaled_col_name], method=method, lambda_val=lambda_val)
     
     return df_copy
 
@@ -467,11 +471,11 @@ def plot_forecast(*dataframes, x='fecha', y='valor_log',
         plt.show()
 
 
-def evaluate_model(y_true, y_pred, show_metrics=False):
+def evaluate_model(y_true, y_pred, show_metrics=False, mode = 'Entrenamiento'):
     mae = mean_absolute_error(y_true, y_pred)
     rmse = np.sqrt(mean_squared_error(y_true, y_pred))
     if show_metrics:
-        print("Evaluación del modelo en el conjunto de entrenamiento:")
+        print(f"Evaluación del modelo en el conjunto de {mode}:")
         metrics_table = [
             ["Métrica", "Valor"],
             ["MAE", mae],
@@ -484,7 +488,8 @@ def evaluate_model(y_true, y_pred, show_metrics=False):
 
 def plot_residuals_over_time(y_true, y_pred, figsize=(12, 6),
                              title = 'Análisis de Errores',
-                             plotly_engine = False):
+                             plotly_engine = False,
+                             label='valor'):
     # Configuraciones comunes
     xlabel_hist = 'Errores'
     ylabel_hist = 'Frecuencia'
@@ -493,8 +498,8 @@ def plot_residuals_over_time(y_true, y_pred, figsize=(12, 6),
     hist_title = 'Distribución de Errores'
     scatter_title = 'Valores Reales vs Predicciones'
 
-    y_true_aligned = y_true
-    y_pred_aligned = y_pred
+    y_true_aligned = y_true[label]
+    y_pred_aligned = y_pred[label]
     if not y_true_aligned.index.equals(y_pred_aligned.index):
         # Reindexa y_pred para que coincida con y_true
         y_pred_aligned = y_pred_aligned.set_axis(y_true_aligned.index)
@@ -548,3 +553,29 @@ def plot_residuals_over_time(y_true, y_pred, figsize=(12, 6),
         plt.suptitle(title)
         plt.tight_layout()
         plt.show()
+
+def split_series(ts, train_size=0.8, show_report=True):
+    """
+    Divide una serie temporal en conjuntos de entrenamiento y prueba.
+
+    Parámetros:
+    ts (pd.Series): Serie temporal a dividir.
+    train_size (float): Proporción de datos para el conjunto de entrenamiento.
+
+    Retorna:
+    pd.Series, pd.Series: Conjuntos de entrenamiento y prueba.
+    """
+    split_index = int(len(ts) * train_size)
+    train = ts.iloc[:split_index]
+    test = ts.iloc[split_index:]
+    if show_report:
+        print(f"Total de datos: {len(ts)}")
+        print(f"Tamaño del conjunto de entrenamiento: {len(train)}")
+        print(f"Tamaño del conjunto de prueba: {len(test)}")
+    return train, test
+
+def evaluate_model_performance(train,test,fittedvalues,forecast, label= 'valor'):
+    print("Evaluating model performance...")
+    train_mae, train_mse = evaluate_model(train[label], fittedvalues[label], show_metrics=True)
+    test_mae, test_mse = evaluate_model(test[label], forecast[label], show_metrics=True)
+    
