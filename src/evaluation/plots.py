@@ -41,7 +41,7 @@ def plot_last_year(df_test, y_test, y_pred, title, plotly_engine=False):
 def plot_residuals_distribution(y_true, y_pred, figsize=(12, 6),
                              title = 'Análisis de Errores',
                              plotly_engine = False,
-                             label='valor'):
+                             label='valor_original'):
     # Configuraciones comunes
     xlabel_hist = 'Errores'
     ylabel_hist = 'Frecuencia'
