@@ -172,6 +172,7 @@ def plot_prophet_forecast(model, forecast, plotly_engine=False, title='Default P
         fig.show()
     else:
         fig = model.plot(forecast)
+        # Ajusta el tamaño de la figura (matplotlib usa figsize en pulgadas)
         plt.axhline(y=0, color='red')
         plt.title(title)
         plt.show()
