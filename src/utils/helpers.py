@@ -13,7 +13,7 @@ from statsmodels.tsa.stattools import adfuller, kpss
 from typing import Literal, Optional
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from plotly.subplots import make_subplots
-
+from IPython.display import display
 def load_data(path, show_info=True, num_rows=5):
     """
     Carga un archivo Parquet en un DataFrame y opcionalmente muestra información básica.
@@ -579,3 +579,78 @@ def evaluate_model_performance(train,test,fittedvalues,forecast, label= 'valor')
     train_mae, train_mse = evaluate_model(train[label], fittedvalues[label], show_metrics=True)
     test_mae, test_mse = evaluate_model(test[label], forecast[label], show_metrics=True)
     
+def setup_logging(root_level=None,
+                prophet_level=None,
+                cmdstanpy_level=None,
+                silence_cmdstanpy=True,
+                stream_to_stderr=True):
+    """
+    Configura logging para el notebook, silenciando cmdstanpy y dejando Prophet en INFO (por defecto).
+    Los parámetros None respetan la configuración previa (p. ej. la de la celda 4).
+    """
+    # Usa niveles por defecto si no se pasan
+    import logging
+    root_level = root_level or logging.WARNING
+    prophet_level = prophet_level or logging.INFO
+    cmdstanpy_level = cmdstanpy_level or logging.WARNING
+
+    # Root: baja el ruido global
+    root = logging.getLogger()
+    root.setLevel(root_level)
+    for h in root.handlers:
+        h.setLevel(root_level)
+
+    # cmdstanpy: silenciar completamente si se solicita
+    logger_cmdstanpy = logging.getLogger('cmdstanpy')
+    logger_cmdstanpy.setLevel(cmdstanpy_level)
+    if silence_cmdstanpy:
+        logger_cmdstanpy.handlers.clear()
+        logger_cmdstanpy.propagate = False
+        if not any(isinstance(h, logging.NullHandler) for h in logger_cmdstanpy.handlers):
+            logger_cmdstanpy.addHandler(logging.NullHandler())
+
+    # prophet: dejar solo sus mensajes con un StreamHandler formateado
+    logger_prophet = logging.getLogger('prophet')
+    logger_prophet.setLevel(prophet_level)
+    logger_prophet.propagate = False
+    # evita duplicar handlers de stream
+    logger_prophet.handlers = [
+        h for h in logger_prophet.handlers
+        if not isinstance(h, logging.StreamHandler)
+    ]
+    if stream_to_stderr:
+        handler = logging.StreamHandler()
+        handler.setLevel(prophet_level)
+        handler.setFormatter(logging.Formatter('%(name)s: %(levelname)s - %(message)s'))
+        logger_prophet.addHandler(handler)
+
+
+def get_years_list(start_year, end_year, forecast_horizon=1, verbose=False):
+    """
+    Crea una lista de años (int) a partir de un año de inicio,
+    fin y un horizonte de pronóstico.
+    """
+    final_end_year = end_year + forecast_horizon
+    
+    if verbose:
+        # --- Arreglo Aquí ---
+        print(f"Generando lista de años desde {start_year} hasta {final_end_year}")
+        
+    # Agregamos +1 para que range() incluya el último año
+    return list(range(start_year, final_end_year + 1))
+
+def get_min_max_years(data, date_col='ds', verbose=False):
+    """
+    Obtiene el año mínimo y máximo de una columna de fechas.
+    
+    Returns:
+        tuple: (start_year, end_year)
+    """
+    start_year = data[date_col].dt.year.min()
+    end_year = data[date_col].dt.year.max()
+    
+    if verbose:
+        # Arreglamos esto:
+        print(f"Rango de años en datos: {start_year} - {end_year}")
+        
+    return start_year, end_year

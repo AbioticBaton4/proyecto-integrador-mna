@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import seaborn as sns
 from typing import Literal, Optional
+from prophet.plot import plot_plotly, plot_components_plotly
 
 def plot_last_year(df_test, y_test, y_pred, title, plotly_engine=False):
     fechas = df_test['fecha']
@@ -151,4 +152,27 @@ def plot_forecast(*dataframes, x='fecha', y='valor_log',
         ax.set_title(title)
         ax.legend()
         ax.grid(True)
+        plt.show()
+
+def plot_prophet_components(model, forecast, plotly_engine=False, title='Prophet Components'):
+    if plotly_engine:
+        fig = plot_components_plotly(model, forecast)
+        fig.update_layout(title=title)
+        fig.show()
+    else:
+        fig = model.plot_components(forecast)
+        plt.title(title)
+        plt.show()
+
+
+def plot_prophet_forecast(model, forecast, plotly_engine=False, title='Default Prophet Forecast'):
+    if plotly_engine:
+        fig = plot_plotly(model, forecast)
+        fig.update_layout(title=title)
+        fig.show()
+    else:
+        fig = model.plot(forecast)
+        # Ajusta el tamaño de la figura (matplotlib usa figsize en pulgadas)
+        plt.axhline(y=0, color='red')
+        plt.title(title)
         plt.show()
