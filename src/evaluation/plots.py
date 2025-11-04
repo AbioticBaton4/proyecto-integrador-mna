@@ -165,14 +165,142 @@ def plot_prophet_components(model, forecast, plotly_engine=False, title='Prophet
         plt.show()
 
 
-def plot_prophet_forecast(model, forecast, plotly_engine=False, title='Default Prophet Forecast'):
+def plot_prophet_forecast(model, forecast, plotly_engine=False, title='Default Prophet Forecast', split_date=None):
     if plotly_engine:
         fig = plot_plotly(model, forecast)
-        fig.update_layout(title=title)
+        if split_date is not None:
+            fig.add_vline(
+                x=str(split_date),
+                line_width=2,
+                line_dash="dash",
+                line_color="gray"
+            )
+            fig.add_annotation(
+                                x=str(split_date), # La misma fecha de la línea
+                                y=.95,                       # Posición vertical (95% hacia arriba)
+                                yref="paper",                 # Coordenadas relativas al área del gráfico (no a los datos y)
+                                text="Split Train/Test",      # Tu texto
+                                showarrow=False,              # No mostrar una flecha
+                                font=dict(color="gray"),      # Color de la fuente
+                                xanchor="right",               # Anclar el texto por su lado izquierdo
+                                xshift=-10                     # Moverlo 10 píxeles a la izquierda de la línea
+                                )
+        fig.update_layout(title=title, hovermode="x unified")
         fig.show()
     else:
         fig = model.plot(forecast)
         # Ajusta el tamaño de la figura (matplotlib usa figsize en pulgadas)
+        if split_date is not None:
+            plt.axvline(x=str(split_date), color='gray', linestyle='--', linewidth=2)
         plt.axhline(y=0, color='red')
         plt.title(title)
         plt.show()
+
+
+def plot_predictions(forecast_df, data, split_date, 
+                  title='Forecast con Banda de Confianza', 
+                  x_title='ds', y_title='y', 
+                  width=None, height=None, split_title='Split Train/Test'):
+    """
+    Genera un gráfico de forecast interactivo con Plotly.
+
+    Parámetros:
+    - forecast_df (pd.DataFrame): DataFrame con las predicciones (debe tener 'ds', 'yhat', 'yhat_upper', 'yhat_lower').
+    - actuals_df (pd.DataFrame): DataFrame con los datos reales (debe tener 'ds', 'y').
+    - split_date (str o Timestamp): La fecha (como string o timestamp) donde se hizo la división train/test.
+    - title (str): Título del gráfico.
+    - x_title (str): Título del eje X.
+    - y_title (str): Título del eje Y.
+    - width (int): Ancho de la figura en píxeles.
+    - height (int): Alto de la figura en píxeles.
+    
+    Retorna:
+    - fig (go.Figure): La figura de Plotly.
+    """
+    
+    fig = go.Figure()
+    required_cols_set = {'yhat_upper', 'yhat_lower'}
+
+    if required_cols_set.issubset(forecast_df.columns):
+    # --- 1. Banda de Confianza ---
+        # Límite superior (oculto)
+        fig.add_trace(go.Scatter(
+            x=forecast_df['ds'],
+            y=forecast_df['yhat_upper'],
+            mode='lines',
+            line=dict(width=0),
+            name='Límite Superior',
+            showlegend=False
+        ))
+
+        # Límite inferior (con relleno)
+        fig.add_trace(go.Scatter(
+            x=forecast_df['ds'],
+            y=forecast_df['yhat_lower'],
+            mode='lines',
+            line=dict(width=0),
+            fillcolor='rgba(173, 216, 230, 0.5)',
+            fill='tonexty',
+            name='Límite Inferior', 
+            showlegend=False
+        ))
+
+    # --- 2. Línea de Predicción ---
+    fig.add_trace(go.Scatter(
+        x=forecast_df['ds'],
+        y=forecast_df['yhat'],
+        mode='lines',
+        line=dict(color='rgb(0, 102, 153)', width=2),
+        name='Forecast'
+    ))
+
+    # --- 3. Datos Reales (Puntos) ---
+    fig.add_trace(go.Scatter(
+        x=data['ds'],
+        y=data['y'],
+        name='Datos Reales',
+        mode='markers',
+        marker=dict(color='black', size=4),
+    ))
+
+    # --- 4. Línea de Split Train/Test ---
+    # Convertimos a string para evitar errores de tipo
+    if split_date is not None:
+        split_date_str = str(split_date)
+
+        fig.add_vline(
+            x=split_date_str,
+            line_width=2,
+            line_dash="dash",
+            line_color="gray"
+        )
+
+        fig.add_annotation(
+            x=split_date_str,
+            y=0.95,
+            yref="paper",
+            text="Split Train/Test",
+            showarrow=False,
+            font=dict(color="gray"),
+            xanchor="right",
+            xshift=-10
+        )
+
+    # --- 5. Layout y Estilo ---
+    fig.update_layout(
+        title=title,
+        yaxis_title=y_title,
+        hovermode="x unified",
+        legend_title_text='Componentes',
+        margin=dict(l=40, r=40, b=40, t=80),
+        width=width,  # Controla el ancho
+        height=height,  # Controla el alto
+        xaxis=dict(
+            title=x_title,  
+            rangeslider=dict(
+                visible=True  # Esto activa la barra deslizadora
+            )
+        )
+    )
+    fig.show()
+    return fig

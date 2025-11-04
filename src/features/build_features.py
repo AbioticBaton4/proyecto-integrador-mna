@@ -43,3 +43,21 @@ def prepare_data(data: pd.DataFrame, date_col: str, target_col: str, new_target_
     df.loc[0, new_target_name] = df.iloc[0][target_col]
     df.drop(columns=[target_col], inplace=True)
     return df
+
+def add_lags(df, column, lags):
+    """
+    Agrega columnas de rezagos (lags) a un DataFrame.
+
+    Parámetros:
+    - df: DataFrame original.
+    - column: Nombre de la columna a la que se le agregarán los rezagos.
+    - lags: Lista de enteros que representan los períodos de rezago.
+
+    Retorna:
+    - DataFrame con las columnas de rezagos agregadas.
+    """
+    df_with_lags = df.copy()
+    for lag in lags:
+        df_with_lags[f'{column}_lag{lag}'] = df_with_lags[column].shift(lag)
+    df_with_lags.dropna(inplace=True)  # Eliminar filas con valores NaN generados por los rezagos
+    return df_with_lags
