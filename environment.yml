@@ -3,47 +3,34 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.9
-  # Core data science libraries
-  - pandas
-  - numpy
-  - scipy
-  - scikit-learn
-  - statsmodels
-  
-  # Visualization libraries
+  - python
   - matplotlib
+  - numpy
   - seaborn
+  - statsmodels
+  - scipy
   - plotly
   - python-kaleido
-  
-  # Jupyter environment
-  - jupyter
+  - openpyxl
+  - ipywidgets
   - notebook
   - ipykernel
-  - ipywidgets
-  
-  # Data processing
-  - openpyxl
-  
-  # Additional useful libraries for ML
+  - pandas
+  - jupyter
+  - scikit-learn
   - pip
+  - prophet
   - pip:
-    # From requirements.txt
     - gdown
-    
-    # Data formats and processing
     - pyarrow
     - tabulate
     - xlrd
-    
-    # Additional ML libraries via pip
     - joblib
     - imbalanced-learn
     - xgboost
     - lightgbm
     - optuna
     - yellowbrick
-    
-    # Progress bars and utilities
     - tqdm
+    - tensorflow
+prefix: depression-analysis_env
