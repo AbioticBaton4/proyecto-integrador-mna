@@ -5,6 +5,9 @@ from plotly.subplots import make_subplots
 import seaborn as sns
 from typing import Literal, Optional
 from prophet.plot import plot_plotly, plot_components_plotly
+import pandas as pd
+from pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()
 
 def plot_last_year(df_test, y_test, y_pred, title, plotly_engine=False):
     fechas = df_test['fecha']
@@ -304,3 +307,163 @@ def plot_predictions(forecast_df, data, split_date,
     )
     fig.show()
     return fig
+
+def render_forecast(forecast_df, data, split_date, 
+                  plotly_engine: bool = True,
+                  title='Forecast con Banda de Confianza', 
+                  x_title='ds', y_title='y', 
+                  width=None, height=None, split_title='Split Train/Test'):
+    """
+    Genera un gráfico de forecast, ya sea interactivo con Plotly o estático con Seaborn.
+
+    Parámetros:
+    - forecast_df (pd.DataFrame): DataFrame con las predicciones 
+                                  (debe tener 'ds', 'yhat', 'yhat_upper', 'yhat_lower').
+    - data (pd.DataFrame): DataFrame con los datos reales (debe tener 'ds', 'y').
+    - split_date (str o Timestamp): La fecha donde se hizo la división train/test.
+    - plotly_engine (bool): True (default) para usar Plotly (interactivo), 
+                            False para usar Seaborn (estático).
+    - title (str): Título del gráfico.
+    - x_title (str): Título del eje X.
+    - y_title (str): Título del eje Y.
+    - width (int): Ancho de la figura en píxeles.
+    - height (int): Alto de la figura en píxeles.
+    - split_title (str): Texto para la línea de división.
+    
+    Retorna:
+    - fig (go.Figure o matplotlib.figure.Figure): La figura generada.
+    """
+    
+    # --- 1. Preparación Común de Datos ---
+    # Copiamos para evitar modificar los DataFrames originales (SettingWithCopyWarning)
+    forecast_df_copy = forecast_df.copy()
+    data_copy = data.copy()
+
+    # Asegurar que las columnas de fecha sean datetime
+    forecast_df_copy['ds'] = pd.to_datetime(forecast_df_copy['ds'])
+    data_copy['ds'] = pd.to_datetime(data_copy['ds'])
+    if split_date:
+        split_date = pd.to_datetime(split_date)
+
+    
+    # --- 2. Lógica de PLOTLY (Interactivo) ---
+    if plotly_engine:
+        fig = go.Figure()
+        required_cols_set = {'yhat_upper', 'yhat_lower'}
+
+        # --- 2.1. Banda de Confianza ---
+        if required_cols_set.issubset(forecast_df_copy.columns):
+            fig.add_trace(go.Scatter(
+                x=forecast_df_copy['ds'], y=forecast_df_copy['yhat_upper'],
+                mode='lines', line=dict(width=0),
+                name='Límite Superior', showlegend=False
+            ))
+            fig.add_trace(go.Scatter(
+                x=forecast_df_copy['ds'], y=forecast_df_copy['yhat_lower'],
+                mode='lines', line=dict(width=0),
+                fillcolor='rgba(173, 216, 230, 0.5)', fill='tonexty',
+                name='Límite Inferior', showlegend=False
+            ))
+
+        # --- 2.2. Línea de Predicción ---
+        fig.add_trace(go.Scatter(
+            x=forecast_df_copy['ds'], y=forecast_df_copy['yhat'],
+            mode='lines', line=dict(color='rgb(0, 102, 153)', width=2),
+            name='Forecast'
+        ))
+
+        # --- 2.3. Datos Reales ---
+        fig.add_trace(go.Scatter(
+            x=data_copy['ds'], y=data_copy['y'],
+            name='Datos Reales', mode='markers',
+            marker=dict(color='black', size=4),
+        ))
+
+        # --- 2.4. Línea de Split Train/Test ---
+        if split_date is not None:
+            fig.add_vline(
+                x=split_date, # Usamos el objeto datetime
+                line_width=2, line_dash="dash", line_color="gray"
+            )
+            fig.add_annotation(
+                x=split_date, # Usamos el objeto datetime
+                y=0.95, yref="paper",
+                text=split_title, # Usamos el parámetro
+                showarrow=False, font=dict(color="gray"),
+                xanchor="right", xshift=-10
+            )
+
+        # --- 2.5. Layout y Estilo ---
+        fig.update_layout(
+            title=title,
+            yaxis_title=y_title,
+            hovermode="x unified",
+            legend_title_text='Componentes',
+            margin=dict(l=40, r=40, b=40, t=80),
+            width=width,
+            height=height,
+            xaxis=dict(
+                title=x_title,
+                rangeslider=dict(visible=True)
+            )
+        )
+        fig.show()
+        return fig
+
+    # --- 3. Lógica de SEABORN/MATPLOTLIB (Estático) ---
+    else:
+        # --- 3.1. Configuración de Tamaño ---
+        dpi = 100
+        figsize_w = width / dpi if width else 15
+        figsize_h = height / dpi if height else 7
+        
+        fig, ax = plt.subplots(figsize=(figsize_w, figsize_h))
+        
+        # --- 3.2. Banda de Confianza ---
+        required_cols_set = {'yhat_upper', 'yhat_lower'}
+        if required_cols_set.issubset(forecast_df_copy.columns):
+            ax.fill_between(
+                forecast_df_copy['ds'],
+                forecast_df_copy['yhat_lower'],
+                forecast_df_copy['yhat_upper'],
+                color='lightblue', alpha=0.5,
+                label='Banda de Confianza'
+            )
+
+        # --- 3.3. Línea de Predicción ---
+        sns.lineplot(
+            data=forecast_df_copy, x='ds', y='yhat', ax=ax,
+            color='#006699', linewidth=2, label='Forecast'
+        )
+
+        # --- 3.4. Datos Reales ---
+        sns.scatterplot(
+            data=data_copy, x='ds', y='y', ax=ax,
+            color='black', s=20, label='Datos Reales'
+        )
+
+        # --- 3.5. Línea de Split Train/Test ---
+        if split_date is not None:
+            ax.axvline(
+                x=split_date, color='gray',
+                linestyle='--', linewidth=2
+            )
+            ax.text(
+                x=split_date, y=0.95,
+                s=f' {split_title}', # Pequeño espacio para que no toque la línea
+                transform=ax.get_xaxis_transform(),
+                ha='right', va='top',
+                color='gray', fontsize=10
+            )
+
+        # --- 3.6. Layout y Estilo ---
+        ax.set_title(title, fontsize=16)
+        ax.set_xlabel(x_title)
+        ax.set_ylabel(y_title)
+        fig.autofmt_xdate() # Formatear fechas en eje X
+        ax.legend(title='Componentes', loc='upper left')
+        sns.despine() # Quitar bordes
+        plt.tight_layout()
+        plt.show()
+        
+        return fig
