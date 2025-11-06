@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.metrics import mean_absolute_error, mean_squared_error, mean_absolute_percentage_error
 from tabulate import tabulate
+import pandas as pd
 
 
 def show_metric_summary(metrics, format='text',mode = 'Entrenamiento'):
