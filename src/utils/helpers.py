@@ -14,6 +14,7 @@ from typing import Literal, Optional
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from plotly.subplots import make_subplots
 from IPython.display import display
+import itertools
 def load_data(path, show_info=True, num_rows=5):
     """
     Carga un archivo Parquet en un DataFrame y opcionalmente muestra información básica.
@@ -672,3 +673,19 @@ def split_ts(ts, test_size=52, show_report=False):
         print(f"Tamaño del conjunto de entrenamiento: {len(train)}")
         print(f"Tamaño del conjunto de prueba: {len(test)}")
     return train, test
+
+def generate_param_list(grid):  
+    return [dict(zip(grid.keys(), v)) for v in itertools.product(*grid.values())]
+
+def save_model_params(params, path):
+    import json
+    with open(path, 'w') as f:
+        json.dump(params, f)
+    print(f"Parámetros del modelo guardados en: {path}")
+
+def load_model_params(path):
+    import json
+    with open(path, 'r') as f:
+        params = json.load(f)
+    print(f"Parámetros del modelo cargados desde: {path}")
+    return params

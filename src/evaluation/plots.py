@@ -9,6 +9,30 @@ import pandas as pd
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
 
+MARKER_STYLES_DICT = {
+    'lines': {'marker': None, 'ls': None},       # Para Seaborn: línea por defecto
+    'markers': {'marker': 'o', 'ls': 'none'},   # Para Seaborn: solo marcadores (sin línea)
+    'lines+markers': {'marker': 'o', 'ls': None}, # Para Seaborn: línea y marcadores
+}
+
+def get_marker_params(marker_style, plotly_engine):
+    '''
+    Devuelve los parámetros de estilo de marcador adecuados para Plotly o Seaborn.
+    Parámetros:
+    - marker_style (str): 'lines', 'markers', o 'lines+markers'.
+    - plotly_engine (bool): True para Plotly, False para Seaborn.
+    Retorna:
+    - dict: Parámetros de estilo para el motor gráfico seleccionado.
+    '''
+    if marker_style not in MARKER_STYLES_DICT:
+        allowed_styles = list(MARKER_STYLES_DICT.keys())
+        raise ValueError(f"marker debe ser uno de {allowed_styles}, no '{marker_style}'")
+    if plotly_engine:
+        return dict(mode=marker_style)
+    else:
+        return MARKER_STYLES_DICT[marker_style]
+    
+
 def plot_last_year(df_test, y_test, y_pred, title, plotly_engine=False):
     fechas = df_test['fecha']
 
@@ -308,11 +332,10 @@ def plot_predictions(forecast_df, data, split_date,
     fig.show()
     return fig
 
-def render_forecast(forecast_df, data, split_date, 
-                  plotly_engine: bool = True,
-                  title='Forecast con Banda de Confianza', 
-                  x_title='ds', y_title='y', 
-                  width=None, height=None, split_title='Split Train/Test'):
+def render_forecast(forecast_df, data, split_date=None, plotly_engine: bool = True,
+                  title='Forecast con Banda de Confianza', x_title='ds', y_title='y', 
+                  width=None, height=None, split_title='Split Train/Test',
+                  data_marker_type = 'markers', show_uncertainty: bool = True):
     """
     Genera un gráfico de forecast, ya sea interactivo con Plotly o estático con Seaborn.
 
@@ -329,7 +352,8 @@ def render_forecast(forecast_df, data, split_date,
     - width (int): Ancho de la figura en píxeles.
     - height (int): Alto de la figura en píxeles.
     - split_title (str): Texto para la línea de división.
-    
+    - data_marker_type (str): Tipo de marcador para los datos reales ('lines', 'markers', 'lines+markers').
+    - show_uncertainty (bool): Si se debe mostrar la banda de incertidumbre.
     Retorna:
     - fig (go.Figure o matplotlib.figure.Figure): La figura generada.
     """
@@ -342,6 +366,8 @@ def render_forecast(forecast_df, data, split_date,
     # Asegurar que las columnas de fecha sean datetime
     forecast_df_copy['ds'] = pd.to_datetime(forecast_df_copy['ds'])
     data_copy['ds'] = pd.to_datetime(data_copy['ds'])
+
+    data_marker_params = get_marker_params(data_marker_type, plotly_engine)
     if split_date:
         split_date = pd.to_datetime(split_date)
 
@@ -352,7 +378,7 @@ def render_forecast(forecast_df, data, split_date,
         required_cols_set = {'yhat_upper', 'yhat_lower'}
 
         # --- 2.1. Banda de Confianza ---
-        if required_cols_set.issubset(forecast_df_copy.columns):
+        if show_uncertainty and required_cols_set.issubset(forecast_df_copy.columns):
             fig.add_trace(go.Scatter(
                 x=forecast_df_copy['ds'], y=forecast_df_copy['yhat_upper'],
                 mode='lines', line=dict(width=0),
@@ -375,8 +401,9 @@ def render_forecast(forecast_df, data, split_date,
         # --- 2.3. Datos Reales ---
         fig.add_trace(go.Scatter(
             x=data_copy['ds'], y=data_copy['y'],
-            name='Datos Reales', mode='markers',
+            name='Datos Reales', 
             marker=dict(color='black', size=4),
+            **data_marker_params
         ))
 
         # --- 2.4. Línea de Split Train/Test ---
@@ -421,7 +448,7 @@ def render_forecast(forecast_df, data, split_date,
         
         # --- 3.2. Banda de Confianza ---
         required_cols_set = {'yhat_upper', 'yhat_lower'}
-        if required_cols_set.issubset(forecast_df_copy.columns):
+        if show_uncertainty and required_cols_set.issubset(forecast_df_copy.columns):
             ax.fill_between(
                 forecast_df_copy['ds'],
                 forecast_df_copy['yhat_lower'],
@@ -437,9 +464,10 @@ def render_forecast(forecast_df, data, split_date,
         )
 
         # --- 3.4. Datos Reales ---
-        sns.scatterplot(
+        sns.lineplot(
             data=data_copy, x='ds', y='y', ax=ax,
-            color='black', s=20, label='Datos Reales'
+            color='black', markersize=4, label='Datos Reales',
+            **data_marker_params
         )
 
         # --- 3.5. Línea de Split Train/Test ---
