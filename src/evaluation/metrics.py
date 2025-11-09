@@ -97,3 +97,32 @@ def show_metrics_table(models_metrics, round_digits=4, table_format='github'):
             print(f"\n--- Métricas del modelo: {mode} ---")
             for metric_name, value in metrics.items():
                 print(f"  {metric_name}: {value}")
+
+def show_metrics(models_metrics, metric_name = 'MAPE'):
+    results_list = []
+
+# Nivel 1: Iterar sobre los modelos
+    for model_name, horizons in models_metrics.items():
+        
+        # Nivel 2: Iterar sobre los horizontes (1 año, 2 años)
+        for test_size, data_set in horizons.items():
+
+
+            scores = data_set.get('test', {})
+
+            # Creamos un diccionario para la fila
+            row = {
+                'nombre_del_modelo': model_name,
+                'test_size': test_size.split('-')[0]
+            }
+            
+            # Agregamos las métricas de 'scores' a la fila
+            row.update(scores)
+            
+            # Añadimos esta fila a nuestra lista
+            results_list.append(row)
+
+    # Al final, creamos el DataFrame
+    df_metricas = pd.DataFrame(results_list).sort_values(by=metric_name)
+
+    print(df_metricas.to_markdown(tablefmt='github', index=False))
