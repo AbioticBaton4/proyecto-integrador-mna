@@ -133,3 +133,4 @@ def analyze_decomposition(series, model='additive', plot=True, figsize=(10, 8)):
     # Siempre devuelve el objeto de descomposición para análisis posterior
     return decomposition
 
+

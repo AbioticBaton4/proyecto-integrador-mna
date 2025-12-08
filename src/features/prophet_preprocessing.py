@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from prophet.make_holidays import make_holidays_df
-from ..utils.helpers import get_min_max_years, get_years_list
+from ..utils.io import get_min_max_years, get_years_list
 
 EPIDEMIC_DATA = [
     {'holiday': 'importación_de_casos', 'ds': '2020-02-28', 'lower_window': 0, 'ds_upper': '2020-03-23'},
